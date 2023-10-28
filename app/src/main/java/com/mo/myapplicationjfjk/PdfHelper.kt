@@ -102,27 +102,79 @@ fun sharePdf(context: Context, pdfFile: File) {
 
 
 
-@SuppressLint("Recycle")
-fun copyPdfToLocal(destinationUri: Uri, fileName: String, context: Context) {
-    val sourceFilePath = File(context.cacheDir, "PDFs").absolutePath + File.separator + fileName
 
-    try {
-        val sourceFile = File(sourceFilePath)
-        val sourceStream = FileInputStream(sourceFile)
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.pdf.PdfDocument
+import android.os.Environment
+import android.view.Window
+import java.io.File
+import java.io.FileOutputStream
 
-        val destinationDocumentFile = DocumentFile.fromTreeUri(context, destinationUri)
-        val destinationFile = destinationDocumentFile!!.createFile("application/pdf", fileName)
+val TAG = "PdfHelper "
 
-        val destinationStream = context.contentResolver.openOutputStream(destinationFile!!.uri)
-        val buffer = ByteArray(8192)
-        var read: Int
+fun captureScreenShot(window: Window): Bitmap {
+    val rootView = window.decorView.rootView
+    val screenBitmap = Bitmap.createBitmap(rootView.width, rootView.height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(screenBitmap)
+    rootView.draw(canvas)
+    return screenBitmap
+}
 
-        while (sourceStream.read(buffer).also { read = it } != -1) {
-            destinationStream!!.write(buffer, 0, read)
-        }
-        sourceStream.close()
-        destinationStream!!.close()
+fun createPdfFromBitmap(bitmap: Bitmap): PdfDocument {
+    val pdfDocument = PdfDocument()
+    val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, 1).create()
+    val page = pdfDocument.startPage(pageInfo)
+    val canvas = page.canvas
+    canvas.drawBitmap(bitmap, 0f, 0f, null)
+    pdfDocument.finishPage(page)
+    return pdfDocument
+}
+
+fun savePDFToAppCacheFiles(pdfDocument: PdfDocument, fileName: String, context: Context): File? {
+    val dir = File(context.cacheDir, "PDFs")
+    if (!dir.exists()) {
+        dir.mkdirs()
+    }
+    val file = File(dir, "$fileName.pdf")
+    return try {
+        val fos = FileOutputStream(file)
+        pdfDocument.writeTo(fos)
+        fos.close()
+        pdfDocument.close()
+        file
     } catch (e: Exception) {
         e.printStackTrace()
+        pdfDocument.close()
+        null
     }
+}
+
+fun savePDFToDownloadFolder(pdfDocument: PdfDocument, fileName: String): Boolean {
+    if (isExternalStorageWritable()) {
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        val file = File(dir, "$fileName.pdf")
+        return try {
+            val fos = FileOutputStream(file)
+            pdfDocument.writeTo(fos)
+            fos.close()
+            pdfDocument.close()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            pdfDocument.close()
+            false
+        }
+    } else {
+        return false
+    }
+}
+
+private fun isExternalStorageWritable(): Boolean {
+    val state = Environment.getExternalStorageState()
+    return Environment.MEDIA_MOUNTED == state
 }
