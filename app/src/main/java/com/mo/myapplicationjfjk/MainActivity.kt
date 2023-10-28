@@ -1,81 +1,86 @@
 package com.mo.myapplicationjfjk
 
 import android.Manifest
-import android.content.pm.PackageManager
+import android.app.Activity
+import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.isGone
 import com.mo.myapplicationjfjk.databinding.ActivityMainBinding
+import java.io.OutputStream
 
 class MainActivity : AppCompatActivity() {
 
     private val binding: ActivityMainBinding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
-
     private var screenshotBitmap: Bitmap? = null
+
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            takeScreenShot()
+        }
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
-        checkForPermissions()
         setOnClicks()
     }
-
     private fun setOnClicks() {
         binding.apply {
-
             btn.setOnClickListener {
-                takeScreenShot()
+                askForStoragePermissions()
             }
-
             btn2.setOnClickListener {
                 savePdf()
             }
-
         }
     }
-
-    private fun checkForPermissions() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                1
-            )
+    private fun askForStoragePermissions() =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            storagePermissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+        } else {
+            storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
-    }
-
     private fun takeScreenShot() {
         hideViewsForScreenShot()
         screenshotBitmap = captureScreenShot(window)
         showViewsForScreenShot()
         binding.ivScreenShot.setImageBitmap(screenshotBitmap)
     }
-
     private fun savePdf() {
         screenshotBitmap?.let {
+
             val pdf = createPdfFromBitmap(it)
-            savePdfToExternalStorage(pdf, "test Pdf", this)
+
+            val savedPDFFile = savePDFToAppCacheFiles(pdf, "testPdf", this)
+
+            savedPDFFile?.let { cachedPDF ->
+                sharePdfWithDownloadOption(this, cachedPDF )
+            }
+
         } ?: Toast.makeText(this, "take a screenshot", Toast.LENGTH_SHORT).show()
     }
-
     private fun hideViewsForScreenShot() {
         binding.btn.isGone = true
         binding.btn2.isGone = true
     }
-
     private fun showViewsForScreenShot() {
         binding.btn.isGone = false
         binding.btn2.isGone = false
     }
-
+    private fun showToast(text: String) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+    }
 }
