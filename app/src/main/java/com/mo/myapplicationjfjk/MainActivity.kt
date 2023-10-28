@@ -1,9 +1,11 @@
 package com.mo.myapplicationjfjk
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -11,10 +13,11 @@ import android.widget.Toast
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
 import androidx.core.view.isGone
+import androidx.documentfile.provider.DocumentFile
 import com.mo.myapplicationjfjk.databinding.ActivityMainBinding
-import java.io.OutputStream
+import java.io.File
+import java.io.FileInputStream
 
 class MainActivity : AppCompatActivity() {
 
@@ -30,6 +33,19 @@ class MainActivity : AppCompatActivity() {
             takeScreenShot()
         }
     }
+
+    val OPEN_DIRECTORY_REQUEST =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val data = result.data
+                if (data != null) {
+                    val uri = data.data
+                    val fileName = "testPdf.pdf"
+                    Log.d(TAG, fileName )
+                    copyPdfToLocal(uri!!, fileName , this@MainActivity)
+                }
+            }
+        }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,7 +83,7 @@ class MainActivity : AppCompatActivity() {
             val savedPDFFile = savePDFToAppCacheFiles(pdf, "testPdf", this)
 
             savedPDFFile?.let { cachedPDF ->
-                sharePdfWithDownloadOption(this, cachedPDF )
+                savePdfToLocal()
             }
 
         } ?: Toast.makeText(this, "take a screenshot", Toast.LENGTH_SHORT).show()
@@ -83,4 +99,11 @@ class MainActivity : AppCompatActivity() {
     private fun showToast(text: String) {
         Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
     }
+
+    fun savePdfToLocal() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        OPEN_DIRECTORY_REQUEST.launch(intent)
+    }
+
+
 }

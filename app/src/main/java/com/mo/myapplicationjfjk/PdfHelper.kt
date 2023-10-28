@@ -1,15 +1,22 @@
 package com.mo.myapplicationjfjk
 
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
 import android.util.Log
 import android.view.Window
-import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.documentfile.provider.DocumentFile
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 
 val TAG = "PdfHelper "
@@ -93,26 +100,29 @@ fun sharePdf(context: Context, pdfFile: File) {
     context.startActivity(Intent.createChooser(shareIntent, "Share PDF using"))
 }
 
-fun downloadPdf(
-    context: Context, pdfFile: File,
-) {
 
-    if (pdfFile.exists().not()) {
-        return
+
+@SuppressLint("Recycle")
+fun copyPdfToLocal(destinationUri: Uri, fileName: String, context: Context) {
+    val sourceFilePath = File(context.cacheDir, "PDFs").absolutePath + File.separator + fileName
+
+    try {
+        val sourceFile = File(sourceFilePath)
+        val sourceStream = FileInputStream(sourceFile)
+
+        val destinationDocumentFile = DocumentFile.fromTreeUri(context, destinationUri)
+        val destinationFile = destinationDocumentFile!!.createFile("application/pdf", fileName)
+
+        val destinationStream = context.contentResolver.openOutputStream(destinationFile!!.uri)
+        val buffer = ByteArray(8192)
+        var read: Int
+
+        while (sourceStream.read(buffer).also { read = it } != -1) {
+            destinationStream!!.write(buffer, 0, read)
+        }
+        sourceStream.close()
+        destinationStream!!.close()
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
-
-    val uri = FileProvider.getUriForFile(context, "com.mo.myapplicationjfjk.fileprovider", pdfFile)
-
-    val downloadIntent = Intent(Intent.ACTION_CREATE_DOCUMENT)
-    downloadIntent.type = "application/pdf"
-    downloadIntent.putExtra(Intent.EXTRA_STREAM, uri)
-    downloadIntent.putExtra(Intent.EXTRA_TITLE, pdfFile.name)
-    downloadIntent.addCategory(Intent.CATEGORY_OPENABLE)
-
-
-
-    val downloadChooser = Intent.createChooser(downloadIntent, "Download PDF")
-    downloadChooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(downloadIntent))
-
-    context.startActivity(downloadChooser)
 }
